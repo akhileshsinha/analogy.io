@@ -50,7 +50,9 @@ exports.listTopics = async (req, res, next) => {
         .sort(sortObj)
         .skip(skip)
         .limit(Number(limit))
-        .select("title category responsesCount popularityScore createdAt")
+        .select(
+          "title category responsesCount popularityScore createdAt imageUrl"
+        )
         .lean(),
       Topic.countDocuments(match),
     ]);

@@ -10,6 +10,7 @@ const topicSchema = new Schema(
     responsesCount: { type: Number, default: 0 },
     upvotesCount: { type: Number, default: 0 },
     popularityScore: { type: Number, default: 0 },
+    imageUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );

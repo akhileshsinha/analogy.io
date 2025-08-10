@@ -1,24 +1,62 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
-import { setDevUser } from './api/http'
-import DevUserBar from './components/DevUserBar'
-
+import { Link, Outlet, useLocation } from "react-router-dom";
+import {
+  AppBar,
+  Toolbar,
+  Container,
+  Button,
+  Stack,
+  Typography,
+  IconButton,
+} from "@mui/material";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import DevUserBar from "./components/DevUserBar";
+import { useTheme } from "@mui/material/styles";
+import { useColorMode } from "./main";
 
 export default function App() {
-  const nav = useNavigate()
-  // (Optional) set once with a valid user id from your backend
-  // setDevUser('PASTE_USER_ID_HERE')
+  const theme = useTheme();
+  const { toggle } = useColorMode();
+  const isDark = theme.palette.mode === "dark";
+  const { pathname } = useLocation();
+
+  const NavButton = ({ to, children }) => (
+    <Button
+      component={Link}
+      to={to}
+      color={
+        pathname === to || (to === "/" && pathname === "/")
+          ? "primary"
+          : "inherit"
+      }
+      sx={{ textTransform: "none" }}
+    >
+      {children}
+    </Button>
+  );
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
-            <DevUserBar />
+    <>
+      <AppBar position="sticky" color="inherit" elevation={1}>
+        <Toolbar sx={{ gap: 1 }}>
+          <Typography variant="h6" sx={{ mr: "auto", fontWeight: 700 }}>
+            Analogies
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <NavButton to="/">Topics</NavButton>
+            <NavButton to="/topics/new">New Topic</NavButton>
+            <NavButton to="/leaderboards">Leaderboards</NavButton>
+          </Stack>
+          <IconButton onClick={toggle} aria-label="toggle theme" sx={{ ml: 1 }}>
+            {isDark ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+          </IconButton>
+        </Toolbar>
+      </AppBar>
 
-      <header style={{ display:'flex', gap:16, alignItems:'center', marginBottom:16 }}>
-        <h2 style={{ marginRight:'auto' }}>Analogies</h2>
-        <Link to="/">Topics</Link>
-        <Link to="/topics/new">New Topic</Link>
-        <Link to="/leaderboards">Leaderboards</Link>
-      </header>
-      <Outlet />
-    </div>
-  )
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <DevUserBar />
+        <Outlet />
+      </Container>
+    </>
+  );
 }

@@ -4,6 +4,8 @@ const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
 const serveStatic = require("serve-static");
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
 
 const healthRouter = require("./routes/health");
 const devUser = require("./middlewares/devUser");
@@ -21,6 +23,8 @@ app.use(rateLimit({ windowMs: 5 * 60 * 1000, max: 300 })); // 300 req / 5 min pe
 const corsOrigin = process.env.NODE_ENV === "production" ? false : true; // disable in prod for same-origin
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: "1mb" }));
+const swaggerDoc = YAML.load(path.join(__dirname, "..", "openapi.yaml"));
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 app.use(morgan("dev"));
 app.use(devUser);
 

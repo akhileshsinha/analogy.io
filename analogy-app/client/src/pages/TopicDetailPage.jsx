@@ -2,27 +2,35 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { http } from "../api/http";
 import { useParams } from "react-router-dom";
 import { useState } from "react";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  Stack,
+  Typography,
+  Chip,
+  Divider,
+  TextField,
+  Button,
+  IconButton,
+  Box,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+} from "@mui/material";
+import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import WhatshotOutlinedIcon from "@mui/icons-material/WhatshotOutlined";
 
 export default function TopicDetailPage() {
-  const upvoteTopic = useMutation({
-    mutationFn: () => http.post(`/topics/${id}/upvote`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["topic", id] });
-      qc.invalidateQueries({ queryKey: ["topics"] });
-    },
-    onError: () => alert("Failed to upvote topic"),
-  });
-  const upvoteResponse = useMutation({
-    mutationFn: (rid) => http.post(`/responses/${rid}/upvote`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["responses", id] });
-    },
-    onError: () => alert("Failed to upvote response"),
-  });
   const { id } = useParams();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const limit = 10;
+  const [content, setContent] = useState("");
+  const [posting, setPosting] = useState(false);
 
   const topicQ = useQuery({
     queryKey: ["topic", id],
@@ -37,100 +45,173 @@ export default function TopicDetailPage() {
     keepPreviousData: true,
   });
 
-  const createResponse = useMutation({
-    mutationFn: ({ content }) =>
-      http.post(`/topics/${id}/responses`, { content }),
+  const upvoteTopic = useMutation({
+    mutationFn: () => http.post(`/topics/${id}/upvote`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["responses", id] });
-      qc.invalidateQueries({ queryKey: ["topics"] }); // bump counts in list
+      qc.invalidateQueries({ queryKey: ["topic", id] });
+      qc.invalidateQueries({ queryKey: ["topics"] });
     },
   });
 
-  if (topicQ.isLoading) return <p>Loading…</p>;
-  if (topicQ.isError) return <p>Error loading topic</p>;
+  const upvoteResponse = useMutation({
+    mutationFn: (rid) => http.post(`/responses/${rid}/upvote`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["responses", id] }),
+  });
+
+  const submitResponse = async (e) => {
+    e.preventDefault();
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    try {
+      setPosting(true);
+      await http.post(`/topics/${id}/responses`, { content: trimmed });
+      setContent("");
+      qc.invalidateQueries({ queryKey: ["responses", id] });
+      qc.invalidateQueries({ queryKey: ["topics"] });
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  if (topicQ.isLoading) return <Typography>Loading…</Typography>;
+  if (topicQ.isError)
+    return <Typography color="error">Error loading topic</Typography>;
 
   const t = topicQ.data;
+  const resp = responsesQ.data;
 
   return (
-    <div>
-      <h3>{t.title}</h3>
-      <div style={{ color: "#555", marginBottom: 8 }}>
-        Category: {t.category || "-"} · Responses: {t.responsesCount} · Upvotes:{" "}
-        {t.upvotesCount}
-        <button style={{ marginLeft: 8 }} onClick={() => upvoteTopic.mutate()}>
-          ▲ Upvote
-        </button>
-      </div>
-      <p style={{ whiteSpace: "pre-wrap" }}>{t.description}</p>
-
-      <hr style={{ margin: "16px 0" }} />
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const content = e.target.content.value.trim();
-          if (!content) return;
-          createResponse.mutate({ content });
-          e.target.reset();
-        }}
-      >
-        <textarea
-          name="content"
-          rows={3}
-          placeholder="Add an analogy…"
-          style={{ width: "100%", marginBottom: 8 }}
+    <Stack spacing={2}>
+      {/* Topic header */}
+      <Card variant="outlined">
+        <CardHeader
+          title={
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {t.title}
+            </Typography>
+          }
+          subheader={
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Chip
+                icon={<CategoryOutlinedIcon />}
+                size="small"
+                label={t.category || "—"}
+              />
+              <Chip
+                icon={<ChatBubbleOutlineIcon />}
+                size="small"
+                label={`Responses: ${t.responsesCount}`}
+              />
+              <Chip
+                icon={<WhatshotOutlinedIcon />}
+                size="small"
+                label={`Pop: ${t.popularityScore}`}
+              />
+            </Stack>
+          }
+          action={
+            <IconButton
+              color="primary"
+              onClick={() => upvoteTopic.mutate()}
+              aria-label="upvote topic"
+            >
+              <ThumbUpAltOutlinedIcon />
+            </IconButton>
+          }
         />
-        <button disabled={createResponse.isPending}>Post</button>
-      </form>
+        {t.description && (
+          <CardContent>
+            <Typography sx={{ whiteSpace: "pre-wrap" }}>
+              {t.description}
+            </Typography>
+          </CardContent>
+        )}
+      </Card>
 
-      <h4 style={{ marginTop: 16 }}>Responses</h4>
-      {responsesQ.data?.items?.map((r) => (
-        <div
-          key={r._id}
-          style={{
-            padding: 10,
-            border: "1px solid #eee",
-            borderRadius: 6,
-            marginBottom: 8,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 12,
-              color: "#666",
-            }}
-          >
-            <span>{new Date(r.createdAt).toLocaleString()}</span>
-            <button onClick={() => upvoteResponse.mutate(r._id)}>
-              ▲ {r.upvotesCount || 0}
-            </button>
-          </div>
-          <div>{r.content}</div>
-        </div>
-      ))}
+      {/* Composer */}
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>
+            Add an analogy
+          </Typography>
+          <Stack component="form" onSubmit={submitResponse} spacing={1}>
+            <TextField
+              multiline
+              minRows={3}
+              placeholder="Write a crisp analogy…"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+              <Button type="submit" disabled={posting}>
+                Post
+              </Button>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
 
-      {responsesQ.data && (
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            Prev
-          </button>
-          <span>
-            Page {responsesQ.data.page} /{" "}
-            {Math.ceil(responsesQ.data.total / responsesQ.data.limit) || 1}
-          </span>
-          <button
-            disabled={
-              responsesQ.data.page * responsesQ.data.limit >=
-              responsesQ.data.total
-            }
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </div>
-      )}
-    </div>
+      {/* Responses */}
+      <Card variant="outlined">
+        <CardHeader title={`Responses (${resp?.total ?? 0})`} />
+        <Divider />
+        <CardContent sx={{ pt: 0 }}>
+          {!responsesQ.data?.items?.length && (
+            <Typography color="text.secondary">
+              Be the first to respond.
+            </Typography>
+          )}
+          <List dense>
+            {responsesQ.data?.items?.map((r) => (
+              <ListItem key={r._id} alignItems="flex-start" sx={{ py: 1.5 }}>
+                <ListItemText
+                  primary={
+                    <Typography sx={{ whiteSpace: "pre-wrap" }}>
+                      {r.content}
+                    </Typography>
+                  }
+                  secondary={new Date(r.createdAt).toLocaleString()}
+                />
+                <ListItemSecondaryAction>
+                  <Button
+                    size="small"
+                    startIcon={<ThumbUpAltOutlinedIcon fontSize="small" />}
+                    onClick={() => upvoteResponse.mutate(r._id)}
+                  >
+                    {r.upvotesCount || 0}
+                  </Button>
+                </ListItemSecondaryAction>
+              </ListItem>
+            ))}
+          </List>
+
+          {/* Simple pager */}
+          {resp && (
+            <Box
+              sx={{ display: "flex", gap: 1, justifyContent: "center", mt: 1 }}
+            >
+              <Button
+                variant="outlined"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Prev
+              </Button>
+              <Typography variant="body2" sx={{ alignSelf: "center" }}>
+                Page {resp.page} /{" "}
+                {Math.max(1, Math.ceil(resp.total / resp.limit))}
+              </Typography>
+              <Button
+                variant="outlined"
+                disabled={resp.page * resp.limit >= resp.total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    </Stack>
   );
 }

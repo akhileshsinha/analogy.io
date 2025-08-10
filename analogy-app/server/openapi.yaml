@@ -1,0 +1,505 @@
+openapi: 3.0.3
+
+info:
+  title: Analogies API
+  version: 1.0.0
+  description: Backend for Topics + Analogies app (React + Node + MongoDB).
+servers:
+  - url: http://localhost:4000
+    description: Local
+
+tags:
+  - name: Health
+  - name: Users
+  - name: Topics
+  - name: Responses
+  - name: Leaderboard
+  - name: Admin
+
+components:
+  securitySchemes:
+    DevUserId:
+      type: apiKey
+      in: header
+      name: x-user-id
+      description: Dev-only user id header for write operations.
+    AdminToken:
+      type: apiKey
+      in: header
+      name: x-admin-token
+      description: Required for admin endpoints.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+    SortTopics:
+      name: sort
+      in: query
+      schema:
+        type: string
+        enum: [createdAt, popularityScore, responsesCount]
+        default: createdAt
+    Order:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    Category:
+      name: category
+      in: query
+      schema: { type: string }
+    Purposes:
+      name: purposes
+      in: query
+      description: Comma-separated purposes
+      schema: { type: string }
+    From:
+      name: from
+      in: query
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      schema: { type: string, format: date-time }
+    Period:
+      name: period
+      in: query
+      schema:
+        type: string
+        enum: [daily, weekly, monthly, all]
+        default: all
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    User:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        responsesCount: { type: integer }
+        upvotesReceived: { type: integer }
+        popularityScore: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UserCreate:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        avatarUrl: { type: string }
+    Topic:
+      type: object
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        category: { type: string }
+        purposes:
+          type: array
+          items: { type: string }
+        createdBy: { type: string }
+        responsesCount: { type: integer }
+        upvotesCount: { type: integer }
+        popularityScore: { type: integer }
+        imageUrl: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TopicCard:
+      allOf:
+        - $ref: "#/components/schemas/Topic"
+        - type: object
+          properties:
+            description: {}
+            createdBy: {}
+            updatedAt: {}
+          example: {}
+    TopicCreate:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        category: { type: string }
+        purposes:
+          type: array
+          items: { type: string }
+        createdBy:
+          {
+            type: string,
+            description: "Optional if x-user-id header is present",
+          }
+        imageUrl: { type: string }
+    Response:
+      type: object
+      properties:
+        _id: { type: string }
+        topicId: { type: string }
+        content: { type: string }
+        createdBy: { type: string }
+        upvotesCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ResponseCreate:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
+        createdBy:
+          {
+            type: string,
+            description: "Optional if x-user-id header is present",
+          }
+    PaginatedTopicCards:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              _id: { type: string }
+              title: { type: string }
+              category: { type: string }
+              responsesCount: { type: integer }
+              popularityScore: { type: integer }
+              createdAt: { type: string, format: date-time }
+              imageUrl: { type: string }
+    PaginatedResponses:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Response" }
+    LeaderboardUsers:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              _id: { type: string }
+              name: { type: string }
+              email: { type: string }
+              responsesCount: { type: integer }
+              upvotesReceived: { type: integer }
+              popularityScore: { type: integer }
+              updatedAt: { type: string, format: date-time }
+    LeaderboardTopics:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              _id: { type: string }
+              title: { type: string }
+              category: { type: string }
+              responsesCount: { type: integer }
+              upvotesCount: { type: integer }
+              popularityScore: { type: integer }
+              updatedAt: { type: string, format: date-time }
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  time: { type: string }
+
+  /api/users:
+    post:
+      tags: [Users]
+      summary: Create dev user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/User" } },
+            }
+        "409":
+          {
+            description: Email exists,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Error" } },
+              },
+          }
+
+  /api/topics:
+    get:
+      tags: [Topics]
+      summary: List topics (cards)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/SortTopics"
+        - $ref: "#/components/parameters/Order"
+        - $ref: "#/components/parameters/Category"
+        - $ref: "#/components/parameters/Purposes"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated topic cards
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedTopicCards" }
+    post:
+      tags: [Topics]
+      summary: Create topic
+      security: [{ DevUserId: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TopicCreate" }
+      responses:
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Topic" } },
+              },
+          }
+        "400":
+          {
+            description: Bad request,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Error" } },
+              },
+          }
+        "401":
+          {
+            description: Missing user,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Error" } },
+              },
+          }
+
+  /api/topics/{id}:
+    get:
+      tags: [Topics]
+      summary: Get topic by id
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          {
+            description: Topic,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Topic" } },
+              },
+          }
+        "404":
+          {
+            description: Not found,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Error" } },
+              },
+          }
+
+  /api/topics/{id}/upvote:
+    post:
+      tags: [Topics]
+      summary: Upvote topic (simple increment)
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          {
+            description: Updated topic,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Topic" } },
+              },
+          }
+        "404": { description: Not found }
+
+  /api/topics/{id}/responses:
+    get:
+      tags: [Responses]
+      summary: List responses for a topic
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: sort
+          in: query
+          schema:
+            {
+              type: string,
+              enum: [createdAt, upvotesCount],
+              default: createdAt,
+            }
+        - $ref: "#/components/parameters/Order"
+      responses:
+        "200":
+          {
+            description: Paginated responses,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/PaginatedResponses" },
+                  },
+              },
+          }
+    post:
+      tags: [Responses]
+      summary: Create response (analogy) under topic
+      security: [{ DevUserId: [] }]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResponseCreate" }
+      responses:
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Response" } },
+              },
+          }
+        "400": { description: Bad request }
+        "401": { description: Missing user }
+
+  /api/responses/{id}/upvote:
+    post:
+      tags: [Responses]
+      summary: Upvote a response
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          {
+            description: Updated response,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Response" } },
+              },
+          }
+        "404": { description: Not found }
+
+  /api/leaderboard/users:
+    get:
+      tags: [Leaderboard]
+      summary: User leaderboard
+      parameters:
+        - $ref: "#/components/parameters/Period"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/LeaderboardUsers" } },
+              },
+          }
+
+  /api/leaderboard/topics:
+    get:
+      tags: [Leaderboard]
+      summary: Topic leaderboard
+      parameters:
+        - $ref: "#/components/parameters/Period"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Category"
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/LeaderboardTopics" },
+                  },
+              },
+          }
+
+  /api/admin/recompute-popularity:
+    post:
+      tags: [Admin]
+      summary: Recompute popularity scores (guarded)
+      security: [{ AdminToken: [] }]
+      responses:
+        "200":
+          description: Counts updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  topicsUpdated: { type: integer }
+                  usersUpdated: { type: integer }
+        "401": { description: Unauthorized }
